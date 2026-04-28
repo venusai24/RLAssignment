@@ -36,7 +36,9 @@ P_MATRIX = {
     ('a3', 't1'): 0.0, ('a3', 't2'): 0.41, ('a3', 't3'): 0.85
 }
 
-STATE_DIM  = 3 + 3 + 9    
+# State Dimensions aligned with paper (Section III-D and Table II)
+DEF_STATE_DIM = 3   # |T| (counts of alerts of each type)
+ATT_STATE_DIM = 15  # |T| + |A| * (1 + |T|) (N, M, and S)
 
  
  
@@ -81,13 +83,19 @@ class MockEnvWrapper:
         self.state = self.env.reset()
         return self._flatten(self.state)
 
-    def _flatten(self, state_tuple):
+    def _flatten(self, state_tuple, role='adversary'):
+        """Flattens state tuple according to the player's knowledge."""
         n, m, s = state_tuple
-        return np.concatenate([
-            list(n.values()),
-            list(m.values()),
-            [v for a_dict in s.values() for v in a_dict.values()],
-        ]).astype(np.float32)
+        if role == 'defender':
+            # Defender only observes counts of uninvestigated alerts (N)
+            return np.array(list(n.values())).astype(np.float32)
+        else:
+            # Adversary observes full state (N, M, S)
+            return np.concatenate([
+                list(n.values()),
+                list(m.values()),
+                [v for a_dict in s.values() for v in a_dict.values()],
+            ]).astype(np.float32)
 
     def step(self, def_action, att_action):
         alpha_plus = {t: min(int(def_action[i] * self.env.B), self.env.N[t])
@@ -106,10 +114,11 @@ class MockEnvWrapper:
             
         next_state, reward = self.env.step(alpha_plus, alpha_minus)
         self.state = next_state
-        return self._flatten(next_state), reward, False, {}
+        return next_state, reward, False, {}
 
-    def get_opponent_state(self):
-        return self._flatten(self.state)
+    def get_observation(self, role):
+        """Returns observation for a specific role."""
+        return self._flatten(self.state, role)
 
  
  
@@ -131,19 +140,23 @@ def _safe_call(policy, env_wrapper, flat_state):
 def evaluate_interaction(def_policy, att_policy, env_wrapper, episodes=EVAL_EPISODES, gamma=0.95):
     all_rewards = []
     for _ in range(episodes):
-        flat_state = env_wrapper.reset()
+        env_wrapper.env.reset()
+        env_wrapper.state = env_wrapper.env.get_state()
         ep_reward  = 0.0
         for k in range(MAX_STEPS):
-            d_act = def_policy(env_wrapper, flat_state)
-            a_act = att_policy(env_wrapper, flat_state)
-            flat_state, reward, _, _ = env_wrapper.step(d_act, a_act)
+            d_obs = env_wrapper.get_observation('defender')
+            a_obs = env_wrapper.get_observation('adversary')
+            
+            d_act = def_policy(env_wrapper, d_obs)
+            a_act = att_policy(env_wrapper, a_obs)
+            _, reward, _, _ = env_wrapper.step(d_act, a_act)
             ep_reward += (gamma ** k) * reward
         all_rewards.append(ep_reward)
     return -float(np.mean(all_rewards))
 
 def make_ddpg_oracle(role, B=None, D=None):
     return DDPG_MIX_Oracle(
-        state_dim=STATE_DIM,
+        state_dim=DEF_STATE_DIM if role == 'defender' else ATT_STATE_DIM,
         action_dim=3,
         player_role=role,
         domain='fraud',
@@ -153,7 +166,7 @@ def make_ddpg_oracle(role, B=None, D=None):
 
 def make_sgs_oracle(role, B=None, D=None):
     return SGS_Oracle(
-        state_dim=STATE_DIM,
+        state_dim=DEF_STATE_DIM if role == 'defender' else ATT_STATE_DIM,
         action_dim=3,
         player_role=role,
         n_steps=SGS_N_STEPS,

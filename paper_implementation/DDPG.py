@@ -74,9 +74,10 @@ class DDPG_MIX_Oracle:
         x = Dense(self.critic_hidden, activation='relu', 
                   kernel_initializer=HeNormal())(concat)
         
-         
-         
-        outputs = Dense(1, activation='relu', kernel_initializer=HeNormal())(x)
+         # Output layer: Linear activation (None) to allow negative Q-values
+        # Note: Paper Table II mentions ReLU, but given negative rewards, 
+        # a linear output is required for the network to converge.
+        outputs = Dense(1, activation=None, kernel_initializer=HeNormal())(x)
         
         return Model([state_input, action_input], outputs)
 

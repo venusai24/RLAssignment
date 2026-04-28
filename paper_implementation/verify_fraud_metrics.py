@@ -22,6 +22,10 @@ P_MATRIX = {
     ('a3', 't1'): 0.0, ('a3', 't2'): 0.41, ('a3', 't3'): 0.85
 }
 
+# State Dimensions aligned with paper (Section III-D and Table II)
+DEF_STATE_DIM = 3   # |T| (counts of alerts of each type)
+ATT_STATE_DIM = 15  # |T| + |A| * (1 + |T|) (N, M, and S)
+
 class MockEnvWrapper:
     """Wrapper to interact with DDPG Oracle and existing Env"""
     def __init__(self, env):
@@ -32,13 +36,19 @@ class MockEnvWrapper:
         self.state = self.env.reset()
         return self._flatten_state(self.state)
         
-    def _flatten_state(self, state_tuple):
+    def _flatten_state(self, state_tuple, role='adversary'):
+        """Flattens state tuple according to the player's knowledge."""
         n, m, s = state_tuple
-        return np.concatenate([
-            list(n.values()),
-            list(m.values()),
-            [val for a_dict in s.values() for val in a_dict.values()]
-        ]).astype(np.float32)
+        if role == 'defender':
+            # Defender only observes counts of uninvestigated alerts (N)
+            return np.array(list(n.values())).astype(np.float32)
+        else:
+            # Adversary observes full state (N, M, S)
+            return np.concatenate([
+                list(n.values()),
+                list(m.values()),
+                [val for a_dict in s.values() for val in a_dict.values()]
+            ]).astype(np.float32)
 
     def step(self, def_action, att_action):
         alpha_plus = {t: def_action[i] * self.env.B for i, t in enumerate(self.env.T)}
@@ -46,10 +56,11 @@ class MockEnvWrapper:
         
         next_state_tuple, reward = self.env.step(alpha_plus, alpha_minus)
         self.state = next_state_tuple
-        return self._flatten_state(next_state_tuple), reward, False, {}
+        return next_state_tuple, reward, False, {}
 
-    def get_opponent_state(self):
-        return self._flatten_state(self.state)
+    def get_observation(self, role):
+        """Returns observation for a specific role."""
+        return self._flatten_state(self.state, role)
 
 def dummy_utility(def_policy, att_policy):
     return 0.0
@@ -109,18 +120,22 @@ def evaluate_interaction(def_policy, att_policy, env_wrapper, episodes=10):
     gamma = 0.95
     all_rewards = []
     for _ in range(episodes):
-        flat_state = env_wrapper.reset()
+        env_wrapper.env.reset()
+        env_wrapper.state = env_wrapper.env.get_state()
         episode_reward = 0
         for k in range(50):
-            d_act_raw = def_policy(env_wrapper, flat_state)
+            d_obs = env_wrapper.get_observation('defender')
+            a_obs = env_wrapper.get_observation('adversary')
+            
+            d_act_raw = def_policy(env_wrapper, d_obs)
             if hasattr(d_act_raw, 'numpy'): d_act_raw = d_act_raw.numpy()
             if d_act_raw.ndim == 2: d_act_raw = d_act_raw[0]
             
-            a_act_raw = att_policy(env_wrapper, flat_state)
+            a_act_raw = att_policy(env_wrapper, a_obs)
             if hasattr(a_act_raw, 'numpy'): a_act_raw = a_act_raw.numpy()
             if a_act_raw.ndim == 2: a_act_raw = a_act_raw[0]
             
-            flat_state, reward, _, _ = env_wrapper.step(d_act_raw, a_act_raw)
+            _, reward, _, _ = env_wrapper.step(d_act_raw, a_act_raw)
             episode_reward += (gamma ** k) * reward
         all_rewards.append(episode_reward)
     return -np.mean(all_rewards)
@@ -153,8 +168,8 @@ def train_solver(B, D, max_iterations=2):
         wrapped_ap = lambda w, s: ap(s)
         return -evaluate_interaction(wrapped_dp, wrapped_ap, MockEnvWrapper(create_env(B, D)), episodes=2)
         
-    def_oracle = DDPG_MIX_Oracle(state_dim, action_dim=len(ALERT_TYPES), player_role='defender', domain='fraud', budget=B)
-    att_oracle = DDPG_MIX_Oracle(state_dim, action_dim=len(ATTACK_TYPES), player_role='adversary', domain='fraud', action_costs=np.array(ATTACKER_COSTS), budget=D)
+    def_oracle = DDPG_MIX_Oracle(DEF_STATE_DIM, action_dim=len(ALERT_TYPES), player_role='defender', domain='fraud', budget=B)
+    att_oracle = DDPG_MIX_Oracle(ATT_STATE_DIM, action_dim=len(ATTACK_TYPES), player_role='adversary', domain='fraud', action_costs=np.array(ATTACKER_COSTS), budget=D)
     
     init_def_policies = [lambda s: np.ones(len(ALERT_TYPES)) / len(ALERT_TYPES)]
     init_att_policies = [lambda s: np.ones(len(ATTACK_TYPES)) / len(ATTACK_TYPES)]
