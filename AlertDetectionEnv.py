@@ -4,19 +4,7 @@ import random
 class AlertDetectionEnv:
     def __init__(self, alert_types, attack_types, def_budget, att_budget, 
                  investigation_costs, attack_costs, attack_losses, alert_probs, false_alert_probs):
-        """
-        Initializes the Attack Detection Environment.
-        
-        :param alert_types: List of alert types (T)
-        :param attack_types: List of attack types (A)
-        :param def_budget: Defender's budget (B)
-        :param att_budget: Adversary's budget (D)
-        :param investigation_costs: Dict mapping t in T to cost C_t
-        :param attack_costs: Dict mapping a in A to cost E_a
-        :param attack_losses: Dict mapping a in A to loss L_a
-        :param alert_probs: Dict mapping (a, t) to a function that returns number of alerts generated
-        :param false_alert_probs: Dict mapping t to a function that returns number of false alerts generated
-        """
+        """Initializes the Attack Detection Environment."""
         self.T = alert_types
         self.A = attack_types
         self.B = def_budget
@@ -58,11 +46,7 @@ class AlertDetectionEnv:
             raise ValueError(f"Attacker budget exceeded: {att_cost} > {self.D}")
 
     def step(self, alpha_plus, alpha_minus):
-        """
-        Executes one time period (k).
-        :param alpha_plus: Dict mapping t to number of alerts to investigate (Defender Action)
-        :param alpha_minus: Dict mapping a to binary indicator of attack execution (Attacker Action)
-        """
+        """Executes one time period (k)."""
          
         alpha_plus = {t: int(v) for t, v in alpha_plus.items()}
         

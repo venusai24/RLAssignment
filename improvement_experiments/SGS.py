@@ -1,16 +1,4 @@
-"""
-SGS.py — Semi-Gradient n-step Sarsa Oracle with Linear Function Approximation
-==============================================================================
-Drop-in replacement for DDPG_MIX_Oracle (DDPG.py) inside the Double Oracle loop.
-
-Key properties vs DDPG-MIX:
-  • Value function  : Q(s,a) = w · φ(s,a)   [linear, no neural network]
-  • Feature map φ   : degree-2 polynomial basis over (state ∥ action)
-  • Policy          : ε-greedy over K^action_dim discretised candidate actions
-  • Update rule     : Semi-gradient n-step Sarsa (bridges TD and Monte Carlo)
-  • Convergence     : Almost-sure convergence of weights to approximate optimum
-                      under standard step-size schedules (Tsitsiklis & Van Roy, 1997)
-"""
+"""SGS.py — Semi-Gradient n-step Sarsa Oracle with Linear Function Approximation"""
 
 import numpy as np
 import itertools
@@ -21,16 +9,7 @@ import itertools
  
 
 def _polynomial_features(state: np.ndarray, action: np.ndarray, degree: int = 2) -> np.ndarray:
-    """
-    Builds a fixed-length polynomial basis feature vector φ(s,a).
-
-    For degree=2 and input vector x of length d:
-        φ = [1, x_0, x_1, ..., x_d-1,
-             x_0*x_1, x_0*x_2, ..., x_{d-2}*x_{d-1}]   (cross terms)
-
-    This gives a linear function approximator theoretical tractability while
-    capturing first-order interactions between state and action components.
-    """
+    """Builds a polynomial basis feature vector phi(s,a)."""
     x = np.concatenate([state, action]).astype(np.float64)
      
     x = np.clip(x, -1e3, 1e3)
@@ -61,16 +40,7 @@ def _feature_dim(input_dim: int, degree: int = 2) -> int:
  
 
 def _build_action_grid(action_dim: int, n_bins: int = 3) -> np.ndarray:
-    """
-    Creates a discrete grid of candidate actions.
-
-    Each action dimension is divided into n_bins evenly-spaced values in [0, 1].
-    The Cartesian product yields n_bins^action_dim candidate action vectors.
-
-    Example (action_dim=3, n_bins=3):
-        bins = [0.0, 0.5, 1.0]
-        → 27 candidate 3-vectors
-    """
+    """Creates a discrete grid of candidate actions."""
     bins = np.linspace(0.0, 1.0, n_bins)
     grid = list(itertools.product(bins, repeat=action_dim))
     return np.array(grid, dtype=np.float64)    
@@ -81,28 +51,7 @@ def _build_action_grid(action_dim: int, n_bins: int = 3) -> np.ndarray:
  
 
 class SGS_Oracle:
-    """
-    Semi-Gradient n-step Sarsa Oracle with linear function approximation.
-
-    This oracle implements Algorithm 1 of the paper (compute_best_response) using
-    n-step Sarsa instead of DDPG, providing:
-      - Theoretical convergence guarantees (almost-sure)
-      - Faster wall-clock convergence in low-to-medium dimensional state spaces
-      - No replay buffer warm-up overhead
-
-    Parameters
-    ----------
-    state_dim       : Dimension of the flattened state vector.
-    action_dim      : Number of action components (|T| for defender, |A| for attacker).
-    player_role     : 'defender' or 'adversary'.
-    n_steps         : Number of look-ahead steps in the n-step return (default 5).
-    alpha           : Step-size (learning rate) for weight updates (default 0.01).
-    gamma           : Discount factor (default 0.95, matching DDPG).
-    n_bins          : Number of discrete bins per action dimension (default 3).
-    poly_degree     : Degree of polynomial feature basis (default 2).
-    action_costs    : Cost array per attack type (adversary only).
-    budget          : Budget constraint B (defender) or D (adversary).
-    """
+    """Semi-Gradient n-step Sarsa Oracle with linear function approximation."""
 
     def __init__(
         self,
@@ -208,18 +157,7 @@ class SGS_Oracle:
         actions: list,
         rewards: list,
     ):
-        """
-        Applies the semi-gradient n-step Sarsa update to all eligible time steps
-        in the collected trajectory.
-
-        For time step τ (the step being updated):
-            G = Σ_{i=0}^{n-1} γ^i · r_{τ+i+1}
-                + γ^n · Q(s_{τ+n}, a_{τ+n})   [bootstrap if τ+n < T]
-
-            w ← w + α · (G - Q(s_τ, a_τ)) · ∇Q(s_τ, a_τ)
-
-        Since Q is linear, ∇Q(s,a) = φ(s,a).
-        """
+        """Applies the semi-gradient n-step Sarsa update to the trajectory."""
         T = len(rewards)    
         alpha = self._current_alpha()
         self._step_count += 1
@@ -260,19 +198,7 @@ class SGS_Oracle:
         max_steps: int = 400,
         epsilon: float = 0.1,
     ):
-        """
-        Algorithm 1 (paper) implemented with n-step Sarsa.
-
-        For each episode:
-          1. Sample opponent policy from their mixed strategy.
-          2. Roll out an episode using ε-greedy action selection.
-          3. Apply n-step Sarsa update on the collected trajectory.
-
-        Returns
-        -------
-        self  — the oracle itself acts as the trained policy object.
-                Callers use oracle.select_action(state, epsilon=0) to query.
-        """
+        """Algorithm 1 (paper) implemented with n-step Sarsa."""
         epsilon_schedule = np.linspace(epsilon, 0.02, episodes)   
 
         for ep in range(episodes):

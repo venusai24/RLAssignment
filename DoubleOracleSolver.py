@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import linprog
 
 class PolicyContainer:
-    """Stores the policies for the defender and attacker, and their utility matrix[cite: 269]."""
+    """Stores the policies for the defender and attacker, and their utility matrix"""
     def __init__(self, init_def_policies, init_att_policies, utility_evaluator):
         self.def_policies = init_def_policies
         self.att_policies = init_att_policies
@@ -23,7 +23,7 @@ class PolicyContainer:
                 )
 
     def add_policies_and_update_matrix(self, new_def_policy, new_att_policy):
-        """Adds new best response policies to Pi_{+1} and Pi_{-1} and updates U[cite: 277]."""
+        """Adds new best response policies to Pi_{+1} and Pi_{-1} and updates U"""
         if new_def_policy is not None:
             self.def_policies.append(new_def_policy)
         if new_att_policy is not None:
@@ -33,7 +33,7 @@ class PolicyContainer:
         self._initialize_matrix()
 
 class DoubleOracleSolver:
-    """Orchestrates the Double Oracle algorithm to find an approximate MSNE[cite: 268]."""
+    """Orchestrates the Double Oracle algorithm to find an approximate MSNE"""
     def __init__(self, def_oracle, att_oracle, policy_container, env=None):
         self.def_oracle = def_oracle
         self.att_oracle = att_oracle
@@ -41,10 +41,7 @@ class DoubleOracleSolver:
         self.env = env
 
     def solve_msne(self, utility_matrix):
-        """
-        Solves Equation 10 using scipy.optimize.linprog[cite: 250, 274].
-        Returns the optimal mixed strategy distribution and the expected utility.
-        """
+        """Solves the zero-sum game matrix to find the MSNE."""
         num_strategies, num_opponent_strategies = utility_matrix.shape
         
          
@@ -79,7 +76,7 @@ class DoubleOracleSolver:
         return sigma_v, u_v_star
 
     def evaluate_best_response_utility(self, new_policy, mixed_strategy, opponent_policies, is_defender):
-        """Calculates expected utility of a pure strategy against an opponent's mixed strategy[cite: 208]."""
+        """Calculates expected utility of a pure strategy against an opponent's mixed strategy"""
         expected_utility = 0.0
         for i, opp_policy in enumerate(opponent_policies):
             prob = mixed_strategy[i]
@@ -93,7 +90,7 @@ class DoubleOracleSolver:
         return expected_utility
 
     def run(self, max_iterations=50):
-        """Executes the iterative Double Oracle loop[cite: 271]."""
+        """Executes the iterative Double Oracle loop"""
         iteration = 0
         
         while iteration < max_iterations:

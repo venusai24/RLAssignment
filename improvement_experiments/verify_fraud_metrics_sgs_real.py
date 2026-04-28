@@ -1,9 +1,4 @@
-"""
-verify_fraud_metrics_sgs_real.py
-================================
-Runs the DDPG vs SGS comparison using parameters derived from creditcard.csv
-(aligned with the paper's fraud detection case study).
-"""
+"""Comparison between DDPG-MIX and SGS Oracle on Credit Card Fraud Dataset."""
 
 import sys
 import os
@@ -223,9 +218,7 @@ class TimedDoubleOracleSolver(DoubleOracleSolver):
     """Subclass that records iteration count and total training time."""
 
     def run(self, max_iterations=MAX_DO_ITERATIONS, episodes=EPISODES_PER_ORACLE):
-        """
-        Overrides DoubleOracleSolver.run() to: Pass episodes to compute_best_response, Count actual iterations run, Record wall-clock time
-        """
+        """Runs the Double Oracle loop with recorded metrics."""
         self.iterations_run = 0
         t0 = time.perf_counter()
 
@@ -275,10 +268,7 @@ class TimedDoubleOracleSolver(DoubleOracleSolver):
  
 
 def run_oracle_experiment(oracle_name, B, D, oracle_factory_def, oracle_factory_att):
-    """
-    Runs the Double Oracle loop for a single (oracle, B, D) configuration.
-    Returns a dict with timing, policy quality, and convergence metrics.
-    """
+    """Runs a single (oracle, B, D) experiment configuration."""
     print(f"  Oracle: {oracle_name} | B={B}, D={D}")
 
     env    = create_env(B, D)
@@ -289,14 +279,7 @@ def run_oracle_experiment(oracle_name, B, D, oracle_factory_def, oracle_factory_
 
      
     def _safe_call(policy, env_wrapper, flat_state):
-        """
-        Unified policy calling convention.
-        Policies stored in the container fall into three categories:
-        Plain functions  f(s) -> array      (initial uniform policies)
-        SGS_Oracle       oracle(s) -> array  (via __call__, returns batch shape)
-        Keras Model      model(batch)        (returns tensor batch)
-        All three are normalised to return a flat 1-D numpy array.
-        """
+        """Unified policy calling convention for functions, oracles, and models."""
         import tensorflow as tf
         if isinstance(policy, tf.keras.Model):
              

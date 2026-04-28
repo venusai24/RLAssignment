@@ -7,13 +7,7 @@ from tensorflow.keras.initializers import GlorotUniform, HeNormal
 class DDPG_MIX_Oracle:
     def __init__(self, state_dim, action_dim, player_role, domain='intrusion', 
                  action_costs=None, budget=None, gamma=0.95, tau=0.005, buffer_capacity=40000):
-        """
-        Initializes the DDPG-MIX Oracle.
-        player_role: 'defender' or 'adversary'
-        domain: 'fraud' or 'intrusion' (determines hidden units)
-        action_costs: Array of costs for each action (needed for adversary projection)
-        budget: Total budget constraint (D for adversary, B for defender)
-        """
+        """Initializes the DDPG-MIX Oracle."""
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.player_role = player_role
@@ -74,18 +68,13 @@ class DDPG_MIX_Oracle:
         x = Dense(self.critic_hidden, activation='relu', 
                   kernel_initializer=HeNormal())(concat)
         
-         # Output layer: Linear activation (None) to allow negative Q-values
-        # Note: Paper Table II mentions ReLU, but given negative rewards, 
-        # a linear output is required for the network to converge.
+         # Output layer: Linear activation for negative Q-values.
         outputs = Dense(1, activation=None, kernel_initializer=HeNormal())(x)
         
         return Model([state_input, action_input], outputs)
 
     def map_continuous_action(self, raw_action):
-        """
-        Implements the continuous action mapping .
-        raw_action: the sigmoid output from the actor network (range [0,1]).
-        """
+        """Projects continuous actions into the feasible budget space."""
         if self.player_role == 'defender':
              
              
@@ -143,11 +132,7 @@ class DDPG_MIX_Oracle:
 
     def compute_best_response(self, env, opponent_pure_strategies, opponent_mixed_strategy, 
                               episodes=500, max_steps=400, epsilon=0.1):
-        """
-        Algorithm 1: Compute pure-strategy best response to a mixed strategy .
-        opponent_mixed_strategy (\sigma_{-v}) is a list of probabilities.
-        opponent_pure_strategies (\Pi_{-v}) is a list of policy objects/functions.
-        """
+        """Algorithm 1: Compute pure-strategy best response to a mixed strategy."""
         for episode in range(episodes):  
             state = env.reset()  
             
